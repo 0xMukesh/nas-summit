@@ -13,4 +13,4 @@ export const web3Storage = new Web3Storage({
   token: process.env.WEB3_STORAGE_API_KEY!,
 });
 
-export const CURRENT_CHUNK = "data/19.json";
+export const CURRENT_CHUNK = "data/20.json";
