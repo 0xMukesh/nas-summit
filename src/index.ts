@@ -20,4 +20,5 @@ const main = async () => {
 };
 
 console.log(">> starting the script...");
+console.log(`>> reading data from ${CURRENT_CHUNK} file...`);
 main();
