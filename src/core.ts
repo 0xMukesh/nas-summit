@@ -6,7 +6,7 @@ import {
 } from "@solana/web3.js";
 import { TipLink } from "@tiplink/api";
 import { File } from "web3.storage";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import fs from "node:fs";
 
 import {
@@ -129,5 +129,10 @@ export const processRecord = async (record: Record) => {
     console.log("===========================");
   } catch (err) {
     console.log(`>> an error occured\n${err}`);
+    if (err instanceof AxiosError) {
+      console.log(
+        `>> an axios error is occured\nmessage - ${err.message}\ncause - ${err.cause}`
+      );
+    }
   }
 };
