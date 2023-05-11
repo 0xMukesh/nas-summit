@@ -1,6 +1,7 @@
 export type Record = {
-  "Full Name": string;
-  Email: string;
-  TipLink: string;
+  name: string;
+  email: string;
+  tiplink: string;
+  is_done: boolean;
 };
 export type Data = Array<Record>;

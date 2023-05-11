@@ -15,6 +15,8 @@ import {
   payer,
   CURRENT_CHUNK,
   connection,
+  treeAddress,
+  collectionMint,
 } from "./constants";
 import { Data, Record } from "./types";
 
@@ -25,10 +27,14 @@ const sleep = (ms: number) => {
 };
 
 export const processRecord = async (record: Record) => {
-  try {
-    const name = record["Full Name"];
-    console.log(`>> started processing - ${name}`);
+  if (record.is_done) {
+    return;
+  }
 
+  const name = record["name"];
+  console.log(`>> started processing - ${name}`);
+
+  try {
     const response = await axios.get(
       `http://localhost:3000/api/image?name=${name}`,
       {
@@ -40,10 +46,11 @@ export const processRecord = async (record: Record) => {
 
     if (imageBuffer.length === 0) {
       fs.writeFileSync(
-        "logs.log",
+        "errors.log",
         `\nrecieved empty image buffer - ${name}\n`,
         "utf-8"
       );
+      return;
     }
     const imageFile = new File([imageBuffer], "poap.png", {
       type: "image/png",
@@ -52,9 +59,9 @@ export const processRecord = async (record: Record) => {
     const imageCID = await web3Storage.put([imageFile]);
 
     const metadata = {
-      name: "Nas Summit Jakarta",
+      name: "Nas Summit Dubai",
       symbol: "NAS",
-      description: "Nas Daily x Jakarta",
+      description: "Nas Daily x Dubai",
       image: `https://${imageCID}.ipfs.w3s.link/poap.png`,
       properties: {
         files: [
@@ -74,14 +81,16 @@ export const processRecord = async (record: Record) => {
     const metadataCID = await web3Storage.put([metadataFile]);
 
     const tiplink = await TipLink.create();
-    sleep(300);
     const nft = await metaplex.nfts().create(
       {
         uri: `https://${metadataCID}.ipfs.w3s.link/metadata.json`,
-        name: "Nas Summit Jakarta",
+        name: "Nas Summit Dubai",
         symbol: "NAS",
         sellerFeeBasisPoints: 0,
         tokenOwner: tiplink.keypair.publicKey,
+        collection: collectionMint,
+        collectionAuthority: payer,
+        tree: treeAddress,
       },
       {
         commitment: "finalized",
@@ -106,8 +115,9 @@ export const processRecord = async (record: Record) => {
     const data: Data = JSON.parse(fs.readFileSync(CURRENT_CHUNK, "utf-8"));
 
     for (let i = 0; i < data.length; i++) {
-      if (data[i]["Full Name"] === name) {
-        data[i]["TipLink"] = tiplink.url.href;
+      if (data[i]["name"] === name) {
+        data[i]["tiplink"] = tiplink.url.href;
+        data[i]["is_done"] = true;
         break;
       }
     }
