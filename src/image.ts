@@ -64,7 +64,6 @@ export const uploadImages = async () => {
 
         if (record.image_uri.length > 3) {
           imageCID = record.image_uri.split("://")[1].split(".")[0];
-          console.log(imageCID);
           console.log(`>> image was already uploaded - ${record.name}`);
         } else {
           imageCID = await web3Storage.put([imageFile]);
