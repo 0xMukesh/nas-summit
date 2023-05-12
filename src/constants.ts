@@ -17,5 +17,5 @@ export const collectionMint = new PublicKey(
 );
 export const treeAddress = new PublicKey(process.env.TREE_ADDRESS!);
 
-export const CURRENT_CHUNK = "data/20.json";
+export const CURRENT_CHUNK = process.env.CHUNK || "data/12.json";
 export const CURRENT_CHUNK_NUMBER = CURRENT_CHUNK.split("/")[1].split(".")[0];

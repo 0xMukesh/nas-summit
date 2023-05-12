@@ -21,6 +21,8 @@ const scraper = async () => {
         email: record.get("Email") as string,
         tiplink: record.get("Tiplink") ? record.get("Tiplink") : " ",
         is_done: false,
+        image_uri: " ",
+        metadata_uri: " ",
       });
     }
   });
