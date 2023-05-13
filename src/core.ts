@@ -5,20 +5,24 @@ import {
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import { TipLink } from "@tiplink/api";
-import { File } from "web3.storage";
-import axios, { AxiosError } from "axios";
+import {
+  MetadataArgs,
+  TokenProgramVersion,
+  TokenStandard,
+} from "@metaplex-foundation/mpl-bubblegum";
 import fs from "node:fs";
 
 import {
-  web3Storage,
-  metaplex,
   payer,
   CURRENT_CHUNK,
   connection,
   treeAddress,
   collectionMint,
-} from "./constants";
-import { Data, Record } from "./types";
+  collectionMetadata,
+  collectionMasterEdition,
+} from "@/constants";
+import { Data, Record } from "@/types";
+import { mintCompressedNFT } from "./mint";
 
 const sleep = (ms: number) => {
   return new Promise((resolve) => {
@@ -35,78 +39,59 @@ export const processRecord = async (record: Record) => {
   console.log(`>> started processing - ${name}`);
 
   try {
-    const response = await axios.get(
-      `http://localhost:3000/api/image?name=${name}`,
-      {
-        responseType: "arraybuffer",
-      }
-    );
-    const imageBuffer = (await response.data) as Buffer;
-    console.log(`>> fetched the image buffer - ${name} `);
+    const tiplink = await TipLink.create();
 
-    if (imageBuffer.length === 0) {
-      fs.writeFileSync(
-        "errors.log",
-        `\nrecieved empty image buffer - ${name}\n`,
-        "utf-8"
-      );
-      return;
-    }
-    const imageFile = new File([imageBuffer], "poap.png", {
-      type: "image/png",
-    });
-    console.log(`>> uploaded the image on ipfs - ${name}`);
-    const imageCID = await web3Storage.put([imageFile]);
-
-    const metadata = {
+    const compressedNFTMetadata: MetadataArgs = {
       name: "Nas Summit Dubai",
       symbol: "NAS",
-      description: "Nas Daily x Dubai",
-      image: `https://${imageCID}.ipfs.w3s.link/poap.png`,
-      properties: {
-        files: [
-          {
-            uri: `https://${imageCID}.ipfs.w3s.link/poap.png`,
-            type: "image/png",
-          },
-        ],
-        category: null,
-      },
+      uri: record.metadata_uri,
+      creators: [
+        {
+          address: payer.publicKey,
+          verified: false,
+          share: 100,
+        },
+        {
+          address: tiplink.keypair.publicKey,
+          verified: false,
+          share: 0,
+        },
+      ],
+      editionNonce: 0,
+      uses: null,
+      collection: null,
+      primarySaleHappened: false,
+      sellerFeeBasisPoints: 0,
+      isMutable: false,
+      tokenProgramVersion: TokenProgramVersion.Original,
+      tokenStandard: TokenStandard.NonFungible,
     };
 
-    const metadataFile = new File([JSON.stringify(metadata)], "metadata.json", {
-      type: "application/json",
-    });
-    console.log(`>> uploaded the metadata on ipfs - ${name}`);
-    const metadataCID = await web3Storage.put([metadataFile]);
-
-    const tiplink = await TipLink.create();
-    const nft = await metaplex.nfts().create(
-      {
-        uri: `https://${metadataCID}.ipfs.w3s.link/metadata.json`,
-        name: "Nas Summit Dubai",
-        symbol: "NAS",
-        sellerFeeBasisPoints: 0,
-        tokenOwner: tiplink.keypair.publicKey,
-        collection: collectionMint,
-        collectionAuthority: payer,
-        tree: treeAddress,
-      },
-      {
-        commitment: "finalized",
-      }
+    const signature = await mintCompressedNFT(
+      treeAddress,
+      collectionMint,
+      collectionMetadata,
+      collectionMasterEdition,
+      compressedNFTMetadata,
+      tiplink.keypair.publicKey
     );
     console.log(`>> nft minted - ${name}`);
 
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash();
     const transaction = new Transaction();
-    const solTransferInstruction = SystemProgram.transfer({
+
+    const transferInstruction = SystemProgram.transfer({
       fromPubkey: payer.publicKey,
       toPubkey: tiplink.keypair.publicKey,
       lamports: 0.0062 * LAMPORTS_PER_SOL,
     });
-    transaction.add(solTransferInstruction);
-    sleep(300);
-    const solTransferSignature = await sendAndConfirmTransaction(
+    transaction.add(transferInstruction);
+
+    transaction.recentBlockhash = blockhash;
+    transaction.lastValidBlockHeight = lastValidBlockHeight;
+
+    const transferSignature = await sendAndConfirmTransaction(
       connection,
       transaction,
       [payer]
@@ -128,21 +113,13 @@ export const processRecord = async (record: Record) => {
 
     console.log("===========================");
     console.log("name:", name);
-    console.log("nft mint signature:", nft.response.signature);
-    console.log("sol transfer signature:", solTransferSignature);
-    console.log("buffer", imageBuffer);
-    console.log("image cid:", imageCID);
-    console.log("metadata cid:", metadataCID);
-    console.log("token address:", nft.mintAddress.toString());
+    console.log("nft mint signature:", signature);
+    console.log("sol transfer signature:", transferSignature);
     console.log("tiplink public key:", tiplink.keypair.publicKey.toString());
     console.log("tiplink url:", tiplink.url.href);
     console.log("===========================");
+    sleep(300);
   } catch (err) {
     console.log(`>> an error occured\n${err}`);
-    if (err instanceof AxiosError) {
-      console.log(
-        `>> an axios error is occured\nmessage - ${err.message}\ncause - ${err.cause}`
-      );
-    }
   }
 };
